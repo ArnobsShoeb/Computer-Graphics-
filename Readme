@@ -1,1 +1,87 @@
-Features will be here .
+Game Name: Maze Quest 3D: Survival Challenge
+
+
+
+1. Player Movement
+
+The player can navigate the maze freely using W/S keys for forward/backward movement and A/D keys to rotate. Movement is smooth and responsive, allowing precise navigation through corridors and around obstacles.
+
+2. Jumping & Navigation
+
+The player can jump to reach elevated spots, cross small gaps, or avoid hazards strategically, adding a vertical dimension to exploration.
+
+3. Camera System
+
+Third-person perspective using gluLookAt ensures full visibility of the player and surrounding maze.
+
+Adjustable FOV (gluPerspective) for zoom in/out.
+
+Camera movement with arrow keys and a toggle (Right Mouse Button) for first-person view.
+
+4. Grid Floor Arena
+
+The maze floor is rendered as a grid of quads, giving visual cues for navigation. The floor can change colors dynamically, adding a sense of progression and atmosphere.
+
+5. Obstacles & Decorations
+
+Maze features 3D objects like cubes, cylinders, and spheres, which act as walls, barriers, or decoration, enhancing the visual depth and challenge.
+
+6. Goal Zone
+
+A pulsing red quad area marks the level’s goal. Players must reach this zone to complete a level. It’s visually distinct and draws player attention.
+
+7. Collectibles & Power-Ups
+
+Randomly placed coins and power-ups appear as spheres or points. Collecting them increases score, restores health, or grants temporary buffs.
+
+8. HUD & Text Overlay
+
+A Heads-Up Display shows Lives, Score, and Level, ensuring the player always knows their current status. Text is rendered clearly on top of the 3D scene.
+
+9. Bullet Firing
+
+Player can fire projectiles (spheres) using the Left Mouse Button. Bullets interact with hazards or enemies, adding combat mechanics.
+
+10. Cheat Mode
+
+Pressing C key toggles cheat/debug mode, allowing testing of levels, revealing hidden paths, or skipping sections.
+
+11. Reset & Restart
+
+Pressing R key restarts the game from Level 1, giving players the ability to retry after failure.
+
+12. Lives & Health System
+
+The player has a finite number of lives. Collisions, falling hazards, or enemy hits reduce health or life count. Game Over occurs when lives reach zero.
+
+13. Static Walls
+
+Walls act as barriers within the maze. Colliding with them may reduce health or block progress, enforcing careful navigation.
+
+14. Falling Hazards
+
+Certain floor tiles disappear or create holes in later levels, forcing players to plan movements carefully and avoid falling.
+
+15. Moving Hazards
+
+Some obstacles like cubes or cylinders move along predefined paths. Contact with them reduces health, adding dynamic challenge to levels.
+
+16. Level Progression
+
+The game has 3 levels, each with increasing difficulty. Completing the goal zone advances to the next level. Game Over and Victory messages are displayed appropriately.
+
+17. Dynamic Colors & Animations
+
+Floors, hazards, and collectibles change color over time or pulse, enhancing visual feedback and immersion. Animations are handled in the idle() function.
+
+18. Player–Hazard Interaction
+
+Player actions and environmental hazards interact seamlessly. For example, bullets can destroy some hazards, while jumping avoids others.
+
+19. Camera & Player Synergy
+
+Camera adjusts smoothly based on player position and actions, ensuring the view always aligns with gameplay. First-person toggle allows a more immersive experience.
+
+20. HUD Feedback & Game State
+
+All game events — health loss, collectibles, level completion — are reflected in the HUD and visual cues, keeping the player informed in real time.
