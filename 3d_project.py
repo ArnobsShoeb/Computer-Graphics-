@@ -159,3 +159,109 @@ def generate_level(level):
 
 # initialize first level
 generate_level(current_level)
+
+
+
+
+
+
+
+
+# ---------------------------
+# Drawing & Rendering
+# ---------------------------
+def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
+    """Draw 2D text on screen at pixel (x, y)."""
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, window_w, 0, window_h)
+
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    glColor3f(1.0, 1.0, 1.0)  # White text
+    glRasterPos2f(x, y)
+    for ch in text:
+        glutBitmapCharacter(font, ord(ch))
+
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
+
+
+def draw_player():
+    """Draw the player as stacked cubes/cylinders and allow orientation by player_dir."""
+    glPushMatrix()
+    x, y, z = player_pos
+    glTranslatef(x, y, z)
+    glRotatef(180, 0, 0, 1)
+    glRotatef(player_dir, 0, 0, 1)
+    # main body
+    glColor3f(0.0, 0.5, 0.5)
+    glTranslatef(0, 0, 90)
+    glutSolidCube(50)
+    glTranslatef(0, 0, -90)
+    # arms (cylinders)
+    glColor3f(0.0, 0.0, 1.0)
+    glPushMatrix()
+    glTranslatef(0, 10, 50)
+    glRotatef(180, 0, 1, 0)
+    gluCylinder(gluNewQuadric(), 10, 5, 50, 8, 2)
+    glPopMatrix()
+    glPushMatrix()
+    glTranslatef(0, -10, 50)
+    gluCylinder(gluNewQuadric(), 10, 5, 50, 8, 2)
+    glPopMatrix()
+    # head
+    glColor3f(1.0, 0.5, 0.0)
+    glTranslatef(0, 0, 140)
+    gluSphere(gluNewQuadric(), 15, 10, 10)
+    glPopMatrix()
+
+def spawn_random_enemy():
+    """Spawn a single enemy at a random edge of the map with random speed based on level."""
+    global enemies
+    side = random.choice(['top','bottom','left','right'])
+    x, y = 0, 0
+
+    if side == 'top':
+        x = random.randint(-GRID_LENGTH, GRID_LENGTH)
+        y = GRID_LENGTH
+    elif side == 'bottom':
+        x = random.randint(-GRID_LENGTH, GRID_LENGTH)
+        y = -GRID_LENGTH
+    elif side == 'left':
+        x = -GRID_LENGTH
+        y = random.randint(-GRID_LENGTH, GRID_LENGTH)
+    elif side == 'right':
+        x = GRID_LENGTH
+        y = random.randint(-GRID_LENGTH, GRID_LENGTH)
+
+    # Enemy speed depends on level
+    spd = enemy_speed + (current_level - 1) * 2 + random.random() * 2
+
+    enemies.append({'pos': [x, y, 0], 'speed': spd, 'health': 50 + current_level*10, 'cooldown': 0})
+
+
+
+
+
+    def draw_walls():
+        """Draw static walls as raised quads."""
+    glColor3f(0.5, 0.5, 0.5)
+    height = 50
+    for w in walls:
+        x1, y1 = w['x1'], w['y1']
+        x2, y2 = w['x2'], w['y2']
+        # draw vertical wall as a thick quad (extruded)
+        glBegin(GL_QUADS)
+        # base
+        glVertex3f(x1, y1, 0)
+        glVertex3f(x2, y2, 0)
+        glVertex3f(x2, y2, height)
+        glVertex3f(x1, y1, height)
+        glEnd()
