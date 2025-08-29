@@ -1,6 +1,8 @@
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
+from math import atan2 
+from math import sin, cos, radians, sqrt
 import random
 import time
 
@@ -13,6 +15,22 @@ camera_pos = (0, 500, 500)
 fovY = 120  # Field of view
 GRID_LENGTH = 600  # Length of grid lines
 rand_var = 423
+
+# ---------------------------
+# Enemy spawn timer for continuous spawn
+# ---------------------------
+enemy_spawn_timer = 0.0       # counts time since last spawn
+enemy_spawn_interval = 7.0  
+
+
+# ---------------------------
+# Enemy Globals
+# ---------------------------
+enemies = []  # list of dicts {pos:[x,y,z], speed, health, cooldown, target_pos}
+enemy_spawned = False
+enemy_speed = 8.0
+enemy_bullets = []  # bullets fired by enemies
+enemy_fire_cooldown = 1.5  # seconds
 
 # ---------------------------
 # Game Globals (added)
@@ -265,3 +283,62 @@ def spawn_random_enemy():
         glVertex3f(x2, y2, height)
         glVertex3f(x1, y1, height)
         glEnd()
+
+
+def draw_collectibles():
+    """Draw coins and health pickups."""
+    for c in collectibles:
+        if not c.get('active', True):
+            continue
+        x, y, z = c['pos']
+        # pulse
+        pulse = 0.6 + 0.4 * (0.5 + 0.5 * sin(animation_counter * 0.12 + x * 0.01))
+        if c['type'] == 'coin':
+            glColor3f(1.0 * pulse, 0.9 * pulse, 0.0)
+            glPushMatrix()
+            glTranslatef(x, y, 20 + 8 * sin(animation_counter * 0.12 + x * 0.01))
+            glutSolidSphere(8, 8, 8)
+            glPopMatrix()
+        else:
+            glColor3f(0.0, 1.0 * pulse, 0.3)
+            glPushMatrix()
+            glTranslatef(x, y, 20 + 8 * sin(animation_counter * 0.14 + y * 0.01))
+            glutSolidSphere(10, 10, 10)
+            glPopMatrix()
+
+
+def draw_goal():
+    """Pulsing red quad area marks the goal zone."""
+    cx, cy = goal_zone['center']
+    rx, ry = goal_zone['radius_x'], goal_zone['radius_y']
+    # glow factor
+    glow = 0.6 + 0.4 * (0.5 + 0.5 * sin(animation_counter * 0.14))
+    glColor3f(glow, 0.1, 0.1)
+    glPushMatrix()
+    glTranslatef(cx, cy, 1)
+    glBegin(GL_QUADS)
+    glVertex3f(-rx, -ry, 0)
+    glVertex3f(rx, -ry, 0)
+    glVertex3f(rx, ry, 0)
+    glVertex3f(-rx, ry, 0)
+    glEnd()
+    glPopMatrix()
+
+
+def draw_bullets():
+    glColor3f(1.0, 0.6, 0.2)
+    for b in bullets:
+        glPushMatrix()
+        glTranslatef(b['pos'][0], b['pos'][1], b['pos'][2])
+        glutSolidSphere(6, 8, 8)
+        glPopMatrix()
+
+
+def draw_moving_hazards():
+    glColor3f(0.8, 0.3, 0.3)
+    for h in moving_hazards:
+        glPushMatrix()
+        glTranslatef(h['pos'][0], h['pos'][1], h['pos'][2])
+        glutSolidCube(h['size'])
+        glPopMatrix()
+
