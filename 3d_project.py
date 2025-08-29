@@ -694,3 +694,98 @@ def update_bullets(dt):
             if b in bullets:
                 bullets.remove(b)
  
+
+
+def update_collectibles():
+    """Check for collection by player."""
+    global collectibles, score, health
+    for c in collectibles:
+        if not c.get('active', True):
+            continue
+        if distance2([player_pos[0], player_pos[1], player_pos[2] + 30], [c['pos'][0], c['pos'][1], c['pos'][2]]) < (player_radius + 20)**2:
+            # collect
+            c['active'] = False
+            if c['type'] == 'coin':
+                score += 5
+            else:
+                health = min(100, health + 40)
+                score += 8
+
+
+def update_moving_hazards(dt):
+    """Move hazards along their path and check collision with player."""
+    global moving_hazards
+    for h in moving_hazards:
+        # parametric movement along two-point path
+        p0 = h['path'][0]
+        p1 = h['path'][1]
+        # increment t
+        h['t'] += h['speed'] * dt
+        # ping-pong between 0..1
+        t = abs(((h['t'] % 2.0) - 1.0))
+        nx = p0[0] + (p1[0] - p0[0]) * t
+        ny = p0[1] + (p1[1] - p0[1]) * t
+        h['pos'][0] = nx
+        h['pos'][1] = ny
+        # collision with player
+        if distance2(h['pos'], player_pos) < (h['size'] + player_radius)**2:
+            apply_damage(1, reason='Hit moving hazard')
+
+
+def update_falling_tiles(dt):
+    """For level 3 certain tiles will begin to fall when stepped on."""
+    if current_level < 3:
+        return
+    # if player steps on a tile, start its timer; when timer > threshold -> deactivate tile
+    px, py = int(player_pos[0])//100, int(player_pos[1])//100
+    key = (px, py)
+    if key in falling_tiles:
+        if falling_tiles[key]['active']:
+            falling_tiles[key]['timer'] += 1
+            if falling_tiles[key]['timer'] > 120:
+                # tile falls
+                falling_tiles[key]['active'] = False
+                falling_tiles[key]['timer'] = 0
+    # slowly regenerate some tiles
+    for k, v in list(falling_tiles.items()):
+        if not v['active']:
+            if random.random() < 0.001:
+                v['active'] = True
+
+
+def update_jump(dt):
+    global is_jumping, vertical_velocity, player_pos, next_jump_tile
+    if is_jumping:
+        # vertical motion
+        vertical_velocity += gravity * dt * 10.0
+        player_pos[2] += vertical_velocity * dt * 20.0
+
+        # horizontal motion toward next tile
+        if next_jump_tile:
+            target_x, target_y = next_jump_tile
+            # smooth interpolation
+            player_pos[0] += (target_x - player_pos[0]) * 0.2
+            player_pos[1] += (target_y - player_pos[1]) * 0.2
+
+        # land check
+        if player_pos[2] <= ground_z:
+            player_pos[2] = ground_z
+            is_jumping = False
+            vertical_velocity = 0.0
+            next_jump_tile = None
+
+
+
+def check_goal():
+    global current_level, level_complete, game_over
+    cx, cy = goal_zone['center']
+    rx, ry = goal_zone['radius_x'], goal_zone['radius_y']
+    if (cx - rx) <= player_pos[0] <= (cx + rx) and (cy - ry) <= player_pos[1] <= (cy + ry):
+        # reached goal
+        if current_level < max_levels:
+            level_complete = True
+            advance_level()
+        else:
+            # last level -> show congratulations
+            game_over = True
+            level_complete = False
