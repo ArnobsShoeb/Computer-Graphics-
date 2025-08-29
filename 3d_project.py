@@ -268,8 +268,8 @@ def spawn_random_enemy():
 
 
 
-    def draw_walls():
-        """Draw static walls as raised quads."""
+def draw_walls():
+    """Draw static walls as raised quads."""
     glColor3f(0.5, 0.5, 0.5)
     height = 50
     for w in walls:
@@ -342,3 +342,90 @@ def draw_moving_hazards():
         glutSolidCube(h['size'])
         glPopMatrix()
 
+# ---------------------------
+# Input Handlers (as template)
+# ---------------------------
+def keyboardListener(key, x, y):
+    """W/S forward/back, A/D rotate, space to jump, C cheat toggle, R restart, V toggle view (cheat vision)."""
+    global player_pos, player_dir, player_speed, is_jumping, vertical_velocity, cheat_mode
+    global lives, health, score, current_level, game_over, first_person
+
+    if game_over:
+        # allow restart only
+        if key == b'r':
+            restart_game()
+        return
+
+    if key == b'w':
+        # forward relative to player_dir
+        dx = player_speed * cos(radians(player_dir))
+        dy = player_speed * sin(radians(player_dir))
+        try_move(dx, dy)
+    elif key == b's':
+        dx = player_speed * cos(radians(player_dir))
+        dy = player_speed * sin(radians(player_dir))
+        try_move(-dx, -dy)
+    elif key == b'a':
+        player_dir += player_rot_speed
+    elif key == b'd':
+        player_dir -= player_rot_speed
+    elif key == b' ':
+        # Jump
+        global vertical_velocity, is_jumping, next_jump_tile
+        if not is_jumping:
+            # compute front tile center
+            angle = radians(player_dir)
+            # move 1 tile ahead (100 units)
+            next_x = player_pos[0] + 100 * cos(angle)
+            next_y = player_pos[1] + 100 * sin(angle)
+            next_jump_tile = (next_x, next_y)
+
+            # start jump
+            is_jumping = True
+            vertical_velocity = jump_strength
+    elif key == b'c':
+        cheat_mode = not cheat_mode
+    elif key == b'r':
+        restart_game()
+    elif key == b'v':
+        # cheat vision toggle, just change FOV temporarily
+        if cam_pos:
+            toggle_fov()
+    elif key == b'k':
+        global camera_follow
+        camera_follow = not camera_follow
+        print("Camera follow:", camera_follow)
+
+
+
+def specialKeyListener(key, x, y):
+    """Arrow keys move camera position when camera_follow is False."""
+    global cam_pos
+
+    if camera_follow:
+        return  # ignore arrow keys while camera follows player
+
+    if key == GLUT_KEY_UP:
+        cam_pos[2] += 12  # move camera up
+    elif key == GLUT_KEY_DOWN:
+        cam_pos[2] -= 12  # move camera down
+    elif key == GLUT_KEY_LEFT:
+        cam_pos[0] -= 10  # move camera left
+    elif key == GLUT_KEY_RIGHT:
+        cam_pos[0] += 10  # move camera right
+
+
+
+
+def mouseListener(button, state, x, y):
+    """Left click: fire bullet. Right click: toggle first-person view."""
+    global first_person, bullets
+    if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
+        fire_bullet()
+    elif button == GLUT_RIGHT_BUTTON and state == GLUT_DOWN:
+        first_person = not first_person
+        # adjust FOV for first-person
+        if first_person:
+            set_fov(90)
+        else:
+            set_fov(fovY)
