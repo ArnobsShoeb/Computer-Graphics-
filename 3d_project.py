@@ -85,6 +85,15 @@ animation_counter = 0
 # Misc
 random.seed(423)
 
+# ---------------------------
+# Helper utilities
+# ---------------------------
+def clamp(v, a, b):
+    return max(a, min(b, v))
+
+
+def distance2(a, b):
+    return (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2
 
 
 # ---------------------------
@@ -180,7 +189,67 @@ generate_level(current_level)
 
 
 
+# ---------------------------
+# Cheat mode automation
+# ---------------------------
+def cheat_auto(dt):
+    """Automatically move toward goal, only jump/avoid when wall in front."""
+    global player_pos, player_dir, bullets, is_jumping, vertical_velocity, next_jump_tile
 
+    if not cheat_mode or game_over:
+        return
+
+    gx, gy = goal_zone['center']
+    dx = gx - player_pos[0]
+    dy = gy - player_pos[1]
+    distance = sqrt(dx*dx + dy*dy)
+    if distance < 1:
+        return
+
+    # normalize move vector toward goal
+    move_x = dx / distance
+    move_y = dy / distance
+
+    # check wall directly in front (1 tile ahead)
+    check_distance = player_radius + 50
+    front_x = player_pos[0] + move_x * check_distance
+    front_y = player_pos[1] + move_y * check_distance
+
+    wall_in_front = False
+    for w in walls:
+        x1, y1, x2, y2 = w['x1'], w['y1'], w['x2'], w['y2']
+        # simple bounding box check
+        minx, maxx = min(x1, x2) - player_radius, max(x1, x2) + player_radius
+        miny, maxy = min(y1, y2) - player_radius, max(y1, y2) + player_radius
+        if minx <= front_x <= maxx and miny <= front_y <= maxy:
+            wall_in_front = True
+            break
+
+    # move normally toward goal if no wall ahead
+    if not wall_in_front:
+        player_pos[0] += move_x * player_speed * dt
+        player_pos[1] += move_y * player_speed * dt
+    else:
+        # attempt jump over wall
+        if not is_jumping:
+            next_jump_tile = (player_pos[0] + move_x * 100, player_pos[1] + move_y * 100)
+            is_jumping = True
+            vertical_velocity = jump_strength
+
+    # rotate player toward goal
+    player_dir = (180 / 3.14159265) * atan2(dy, dx)
+
+    # auto-fire at nearest enemy in front
+    for e in enemies:
+        ex, ey, ez = e['pos']
+        angle_to_enemy = (180 / 3.14159265) * atan2(ey - player_pos[1], ex - player_pos[0])
+        angle_diff = (angle_to_enemy - player_dir + 360) % 360
+        if angle_diff > 180:
+            angle_diff -= 360
+        dist2_enemy = (ex - player_pos[0])**2 + (ey - player_pos[1])**2
+        if abs(angle_diff) < 45 and dist2_enemy < 200**2:
+            fire_bullet()
+            break
 
 
 
@@ -314,6 +383,14 @@ def draw_grid():
                 glVertex3f(i, j + 100, 0)
     glEnd()
 
+    # Draw line from player to goal
+    if cheat_mode:
+        
+        glColor3f(1.0, 1.0, 0.0)  # yellow line
+        glBegin(GL_LINES)
+        glVertex3f(player_pos[0], player_pos[1], player_pos[2]+50)
+        glVertex3f(goal_zone['center'][0], goal_zone['center'][1], 5)
+        glEnd()
 
 
 def draw_walls():
@@ -789,3 +866,147 @@ def check_goal():
             # last level -> show congratulations
             game_over = True
             level_complete = False
+
+
+
+def advance_level():
+    global current_level, level_complete
+    current_level += 1
+    if current_level > max_levels:
+        current_level = max_levels
+    generate_level(current_level)
+    level_complete = False
+    reset_player_position()
+
+
+def restart_game():
+    global lives, health, score, current_level, game_over, enemies, enemy_spawned
+    lives = 5
+    health = 100
+    score = 0
+    current_level = 1
+    game_over = False
+    enemies = []
+    enemy_spawned = False
+    generate_level(current_level)
+    reset_player_position()
+    spawn_enemies(current_level)
+
+
+
+# ---------------------------
+# Idle & Display (template adapt)
+# ---------------------------
+def idle():
+    # Called continuously; update game state and request redraw
+    global last_time
+    curr = time.time()
+    dt = curr - last_time
+    last_time = curr
+
+    # --- Cheat automation ---
+    cheat_auto(dt * 30.0)
+
+    # update bullets
+    update_bullets(dt * 30.0)  # scale dt for gameplay feel
+    update_collectibles()
+    update_moving_hazards(dt * 5.0)
+    update_falling_tiles(dt * 30.0)
+    update_jump(dt * 30.0)
+    update_enemies(dt * 5.0) 
+    check_goal()
+
+    glutPostRedisplay()
+
+    # --- enemy spawn logic ---
+    global enemy_spawn_timer
+    enemy_spawn_timer += dt
+    if enemy_spawn_timer >= enemy_spawn_interval:
+        enemy_spawn_timer = 0.0
+        spawn_random_enemy()
+
+
+def showScreen():
+    """Main render: clear, setup camera, draw grid, walls, player, HUD, bullets, collectibles, hazards, goal."""
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    glViewport(0, 0, window_w, window_h)
+
+    setupCamera()
+
+    # draw floor
+    draw_grid()
+
+    # draw static walls
+    draw_walls()
+
+    # moving hazards
+    draw_moving_hazards()
+
+    draw_enemies()
+
+    # collectibles
+    draw_collectibles()
+
+    # goal zone
+    draw_goal()
+
+    # draw player
+    draw_player()
+
+    # draw bullets
+    draw_bullets()
+
+    # HUD overlay (rendered in screen coordinates)
+    # Lives, Score, Level, Health
+    draw_text(10, window_h - 150, f"Lives: {lives}")
+    draw_text(10, window_h - 60, f"Health: {health}")
+    draw_text(10, window_h - 90, f"Score: {score}")
+    draw_text(10, window_h - 120, f"Level: {current_level}")
+
+    if cheat_mode:
+        draw_text(window_w - 220, window_h - 30, "CHEAT MODE ON")
+
+    if game_over:
+        if current_level >= max_levels:
+            draw_text(window_w // 2 - 180, window_h // 2 + 20, "🎉 Congratulations! 🎉")
+            draw_text(window_w // 2 - 150, window_h // 2 - 10, "You completed all levels!")
+            draw_text(window_w // 2 - 130, window_h // 2 - 40, "Press R to Restart")
+        else:
+            draw_text(window_w // 2 - 80, window_h // 2 + 20, "GAME OVER!")
+            draw_text(window_w // 2 - 130, window_h // 2 - 10, "Press R to Restart")
+
+    elif level_complete:
+        draw_text(window_w // 2 - 90, window_h // 2 + 20, f"Level {current_level-1} Complete!")
+        draw_text(window_w // 2 - 120, window_h // 2 - 10, "Preparing next level...")
+
+    glutSwapBuffers()
+
+
+# ---------------------------
+# Main entry (template)
+# ---------------------------
+def main():
+    glutInit()
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
+    glutInitWindowSize(window_w, window_h)
+    glutInitWindowPosition(0, 0)
+    glutCreateWindow(b"Maze Quest 3D: Survival Challenge")
+
+    glEnable(GL_DEPTH_TEST)
+
+    glutDisplayFunc(showScreen)
+    glutKeyboardFunc(keyboardListener)
+    glutSpecialFunc(specialKeyListener)
+    glutMouseFunc(mouseListener)
+    glutIdleFunc(idle)
+
+    # init camera pos
+    cam_pos[0], cam_pos[1], cam_pos[2] = camera_pos
+    spawn_enemies(current_level)
+
+    glutMainLoop()
+
+
+if __name__ == "__main__":
+    main()
