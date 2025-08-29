@@ -566,3 +566,131 @@ def try_move(dx, dy):
     # otherwise apply move
     player_pos[0] = new_x
     player_pos[1] = new_y
+
+
+    
+def reset_player_position():
+    player_pos[0] = 0.0
+    player_pos[1] = 570.0
+    player_pos[2] = 0.0
+
+
+def apply_damage(amount, reason=None):
+    global health, lives, game_over
+    health -= amount * 20
+    if reason and cheat_mode:
+        # show debug message in console if cheat mode
+        print("Damage:", amount, "Reason:", reason)
+    if health <= 0:
+        lives -= 1
+        health = 100
+        if lives <= 0:
+            game_over = True
+
+def draw_enemies():
+    glColor3f(1.0, 0.0, 0.0)
+    for e in enemies:
+        glPushMatrix()
+        glTranslatef(e['pos'][0], e['pos'][1], 25)
+        glScalef(1.0, 1.0, 2.5)
+        glutSolidCube(50)
+        glPopMatrix()
+
+
+def update_enemies(dt):
+    global enemies, player_pos, health
+    for e in enemies[:]:  # iterate over a copy since we may remove items
+        # move toward player
+        px, py, pz = player_pos
+        ex, ey, ez = e['pos']
+        dx, dy = px - ex, py - ey
+        dist = sqrt(dx*dx + dy*dy)
+        if dist > 5:
+            e['pos'][0] += (dx / dist) * e['speed'] * dt
+            e['pos'][1] += (dy / dist) * e['speed'] * dt
+
+        # collision with player
+        if distance2([ex, ey, ez], player_pos) < (player_radius + 25)**2:
+            apply_damage(1, reason="Hit by enemy")
+            enemies.remove(e)  # REMOVE enemy on collision
+
+
+
+
+
+def spawn_enemies(level):
+    global enemies, enemy_spawned
+    enemies = []
+    enemy_spawned = True
+    if level == 1:
+        # spawn 2 enemies at fixed positions
+        enemies.append({'pos': [-500, 400, 0], 'speed': enemy_speed, 'health': 50, 'cooldown': 0})
+        enemies.append({'pos': [400, -400, 0], 'speed': enemy_speed, 'health': 50, 'cooldown': 0})
+    elif level == 2:
+        for i in range(3):
+            x = random.randint(-500, 500)
+            y = random.randint(-500, 500)
+            enemies.append({'pos': [x, y, 0], 'speed': enemy_speed+2, 'health': 60, 'cooldown': 0})
+    else:
+        for i in range(4):
+            x = random.randint(-400, 400)
+            y = random.randint(-400, 400)
+            enemies.append({'pos': [x, y, 0], 'speed': enemy_speed+4, 'health': 70, 'cooldown': 0})
+
+
+def fire_bullet():
+    """Create a bullet sphere moving forward from player."""
+    angle = radians(player_dir)
+    bx = player_pos[0] + 30 * cos(angle)
+    by = player_pos[1] + 30 * sin(angle)
+    bz = player_pos[2] + 40  # roughly shoulder height
+    speed = 45.0
+    vx = speed * cos(angle)
+    vy = speed * sin(angle)
+    vz = 0.0
+    bullets.append({'pos': [bx, by, bz], 'vel': [vx, vy, vz], 'life': 60})
+
+
+def update_bullets(dt):
+    """Move bullets, check collision with enemies, remove bullets/enemies on hit, update score."""
+    global bullets, enemies, score
+
+    for b in bullets[:]:
+        # Move bullet
+        b['pos'][0] += b['vel'][0] * dt
+        b['pos'][1] += b['vel'][1] * dt
+        b['pos'][2] += b['vel'][2] * dt
+        b['life'] -= 1
+
+        bullet_removed = False
+
+        # Remove bullet if out of bounds
+        if abs(b['pos'][0]) > GRID_LENGTH or abs(b['pos'][1]) > GRID_LENGTH:
+            bullets.remove(b)
+            continue
+
+        # Check collision with enemies
+        for e in enemies[:]:
+            ex, ey, ez = e['pos']
+            enemy_half_size = 25  # half of cube width
+            enemy_height = 125    # cube height after scaling
+            bullet_radius = 6
+
+            # AABB collision detection
+            if (abs(b['pos'][0] - ex) <= enemy_half_size + bullet_radius and
+                abs(b['pos'][1] - ey) <= enemy_half_size + bullet_radius and
+                abs(b['pos'][2] - ez) <= enemy_height/2 + bullet_radius):
+
+                # Enemy hit -> remove enemy and bullet, update score
+                enemies.remove(e)
+                if b in bullets:
+                    bullets.remove(b)
+                score += 15
+                bullet_removed = True
+                break  # stop checking other enemies for this bullet
+
+        # Remove bullet if life expired
+        if not bullet_removed and b['life'] <= 0:
+            if b in bullets:
+                bullets.remove(b)
+ 
