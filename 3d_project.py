@@ -266,6 +266,54 @@ def spawn_random_enemy():
 
 
 
+def draw_grid():
+    """Render grid floor with dynamic color changes; handle falling tiles."""
+    light_colors = [
+        (0.8, 0.8, 1.0), (0.9, 0.8, 0.9), (1.0, 0.9, 0.8),
+        (0.8, 1.0, 0.8), (1.0, 1.0, 0.8)
+    ]
+    global animation_counter
+    animation_counter += 1
+    glBegin(GL_QUADS)
+    for i in range(-GRID_LENGTH, GRID_LENGTH, 100):
+        for j in range(-GRID_LENGTH, GRID_LENGTH, 100):
+            row = (i + GRID_LENGTH) // 100
+            col = (j + GRID_LENGTH) // 100
+            pulse = 0.1 * sin(animation_counter * 0.05 + row + col)
+            base = light_colors[(row + col) % len(light_colors)]
+            color = (clamp(base[0] + pulse, 0, 1), clamp(base[1] + pulse, 0, 1), clamp(base[2] + pulse, 0, 1))
+
+            active = True
+            if current_level >= 3:
+                key = (i//100, j//100)
+                if key in falling_tiles and not falling_tiles[key]['active']:
+                    active = False
+
+            # --- CHEAT MODE HIGHLIGHT ---
+            if cheat_mode and active:
+                px, py = player_pos[0], player_pos[1]
+                gx, gy = goal_zone['center']
+                tile_center_x = i + 50
+                tile_center_y = j + 50
+                dx = gx - px
+                dy = gy - py
+                if dx != 0 or dy != 0:
+                    t = ((tile_center_x - px) * dx + (tile_center_y - py) * dy) / (dx*dx + dy*dy)
+                    if 0 <= t <= 1:
+                        nearest_x = px + t * dx
+                        nearest_y = py + t * dy
+                        dist2_line = (tile_center_x - nearest_x)**2 + (tile_center_y - nearest_y)**2
+                        if dist2_line < 500:  # threshold
+                            color = (1.0, 0.0, 0.0)  # red for path
+
+            if active:
+                glColor3f(*color)
+                glVertex3f(i, j, 0)
+                glVertex3f(i + 100, j, 0)
+                glVertex3f(i + 100, j + 100, 0)
+                glVertex3f(i, j + 100, 0)
+    glEnd()
+
 
 
 def draw_walls():
@@ -429,3 +477,92 @@ def mouseListener(button, state, x, y):
             set_fov(90)
         else:
             set_fov(fovY)
+            
+            
+# ---------------------------
+# Camera & setup (template)
+# ---------------------------
+def setupCamera():
+    """Configures the camera's projection and view settings (uses cam_pos or follows player)."""
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluPerspective(cam_fov, float(window_w)/float(window_h), 0.1, 1500)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+
+    # Choose camera
+    if first_person:
+        # first-person camera placed near player's head
+        px, py, pz = player_pos
+        angle = radians(player_dir)
+        offset = 20.0
+        camx = px + offset * cos(angle)
+        camy = py + offset * sin(angle)
+        camz = pz + player_height
+        lookx = px + 80.0 * cos(angle)
+        looky = py + 80.0 * sin(angle)
+        lookz = pz + player_height
+        gluLookAt(camx, camy, camz, lookx, looky, lookz, 0, 0, 1)
+    else:
+        # third-person camera placed at cam_pos and looks at player
+        cx, cy, cz = cam_pos
+        # make camera smoothly follow player if camera_follow enabled
+        if camera_follow:
+            # interpolate towards desired third-person position (behind player)
+            desired_x = player_pos[0] + -200 * cos(radians(player_dir))
+            desired_y = player_pos[1] + -200 * sin(radians(player_dir))
+            desired_z = player_pos[2] + player_height
+            # simple smoothing
+            cx = cx + (desired_x - cx) * 0.06
+            cy = cy + (desired_y - cy) * 0.06
+            cz = cz + (desired_z - cz) * 0.06
+            cam_pos[0], cam_pos[1], cam_pos[2] = cx, cy, cz
+        gluLookAt(cx, cy, cz, player_pos[0], player_pos[1], player_pos[2] + 40, 0, 0, 1)
+
+
+def set_fov(val):
+    global cam_fov
+    cam_fov = val
+
+
+def toggle_fov():
+    global cam_fov
+    cam_fov = 90 if cam_fov == fovY else fovY
+
+
+# ---------------------------
+# Gameplay: physics & updates
+# ---------------------------
+def try_move(dx, dy):
+    """Attempt to move player by dx,dy while checking collisions and falling tiles."""
+    new_x = player_pos[0] + dx
+    new_y = player_pos[1] + dy
+    # bounds check
+    if abs(new_x) > GRID_LENGTH or abs(new_y) > GRID_LENGTH:
+        apply_damage(1, reason="Out of bounds")
+        reset_player_position()
+        return
+    # wall collision: treat walls as thick lines (approx)
+    pad = player_radius
+    for w in walls:
+        # simple axis-aligned approximation since walls are axis-aligned lines
+        x1, y1, x2, y2 = w['x1'], w['y1'], w['x2'], w['y2']
+        # if player's new position is near the wall segment
+        # approximate by checking if point projects into bounding rect expanded by pad
+        minx, maxx = min(x1, x2) - pad, max(x1, x2) + pad
+        miny, maxy = min(y1, y2) - pad, max(y1, y2) + pad
+        if minx <= new_x <= maxx and miny <= new_y <= maxy:
+            # collision -> take damage and don't move
+            apply_damage(1, reason="Hit wall")
+            return
+    # falling tile check (level 3): if tile inactive -> falling
+    if current_level >= 3:
+        key = (int(new_x)//100, int(new_y)//100)
+        if key in falling_tiles and not falling_tiles[key]['active']:
+            # fall into hole
+            apply_damage(2, reason='Fell in hole')
+            reset_player_position()
+            return
+    # otherwise apply move
+    player_pos[0] = new_x
+    player_pos[1] = new_y
